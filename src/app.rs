@@ -221,7 +221,7 @@ fn strip_controls(ui: &mut Ui, strips: &mut Vec<Strip>, color_counter: &mut usiz
                 }
 
                 // XY
-                let speed = 0.003;
+                let speed = 0.002;
                 ui.add(
                     DragValue::new(&mut strip.position[0])
                         .prefix("X: ")
@@ -238,6 +238,7 @@ fn strip_controls(ui: &mut Ui, strips: &mut Vec<Strip>, color_counter: &mut usiz
                     DragValue::new(&mut strip.size[1])
                         .prefix("Height: ")
                         .suffix(" cm")
+                        .speed(0.5)
                         .clamp_range(0.0..=f32::MAX),
                 );
 
