@@ -1,6 +1,7 @@
 use egui::{
     color_picker::{color_picker_color32, Alpha},
-    Button, Color32, DragValue, Stroke, Ui, panel::Side,
+    panel::Side,
+    Button, Color32, DragValue, Stroke, Ui,
 };
 
 use crate::{Dimensions, Scene, Strip};
@@ -48,29 +49,32 @@ impl eframe::App for StripApp {
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::SidePanel::new(Side::Left, "Strips").show(ctx, |ui| {
-            strip_ui(
-                ui,
-                &mut self.scene.strips,
-                &self.scene.dims,
-                &mut self.color_counter,
-            );
+            strip_ui(ui, &mut self.scene.strips, &mut self.color_counter);
         });
     }
 }
 
-fn strip_ui(ui: &mut Ui, strips: &mut Vec<Strip>, dims: &Dimensions, color_counter: &mut usize) {
-    if ui.button("+").clicked() {
-        let color = COLOR_TABLE[*color_counter % COLOR_TABLE.len()];
-        *color_counter += 1;
-        strips.push(Strip {
-            position: [0.5; 2],
-            size: [4.8, 50.],
-            rotation: 0.,
-            color,
-        })
-    }
+fn strip_ui(ui: &mut Ui, strips: &mut Vec<Strip>, color_counter: &mut usize) {
+    ui.horizontal(|ui| {
+        if ui.button("+").clicked() {
+            let color = COLOR_TABLE[*color_counter % COLOR_TABLE.len()];
+            *color_counter += 1;
+            strips.push(Strip {
+                position: [0.5; 2],
+                size: [4.8, 50.],
+                rotation: 0.,
+                color,
+            })
+        }
+
+        if ui.button("Clear").clicked() {
+            strips.clear();
+        }
+    });
 
     let mut do_remove = None;
+    let mut do_dup = None;
+
     egui::containers::ScrollArea::vertical().show(ui, |ui| {
         for (idx, strip) in strips.iter_mut().enumerate() {
             ui.horizontal(|ui| {
@@ -109,6 +113,11 @@ fn strip_ui(ui: &mut Ui, strips: &mut Vec<Strip>, dims: &Dimensions, color_count
                         .speed(0.25),
                 );
 
+                // Duplicate
+                if ui.button("Dup").clicked() {
+                    do_dup = Some(idx);
+                }
+
                 // Delete
                 if ui.button("🗑").clicked() {
                     do_remove = Some(idx);
@@ -119,6 +128,10 @@ fn strip_ui(ui: &mut Ui, strips: &mut Vec<Strip>, dims: &Dimensions, color_count
 
     if let Some(idx) = do_remove {
         strips.remove(idx);
+    }
+
+    if let Some(idx) = do_dup {
+        strips.insert(idx, strips[idx]);
     }
 }
 
