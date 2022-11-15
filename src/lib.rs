@@ -2,6 +2,7 @@
 
 mod app;
 pub use app::StripApp;
+use egui::Color32;
 use serde::{Deserialize, Serialize};
 
 /// Dimensions of the peice
@@ -21,7 +22,10 @@ pub struct Strip {
     /// Width, Height in centimeters
     pub size: [f32; 2],
     /// Counter-clockwise rotation with 0 resting on the x axis
+    /// In degrees
     pub rotation: f32,
+    /// Color of the strip; purely for display purposes
+    pub color: Color32,
 }
 
 /// Scene data
