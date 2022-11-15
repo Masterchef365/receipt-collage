@@ -1,7 +1,9 @@
+use eframe::emath::Rot2;
 use egui::{
     color_picker::{color_picker_color32, Alpha},
     panel::{Side, TopBottomSide},
-    Button, Color32, DragValue, Stroke, Ui, plot::Plot,
+    plot::{Line, Plot, PlotPoint, PlotUi},
+    Button, Color32, DragValue, Pos2, Stroke, Ui, Vec2,
 };
 
 use crate::{Dimensions, Scene, Strip};
@@ -51,9 +53,11 @@ impl eframe::App for StripApp {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::TopBottomPanel::new(TopBottomSide::Top, "Controls").min_height(100.).show(ctx, |ui| {
-            strip_controls(ui, &mut self.scene.strips, &mut self.color_counter);
-        });
+        egui::TopBottomPanel::new(TopBottomSide::Top, "Controls")
+            .min_height(100.)
+            .show(ctx, |ui| {
+                strip_controls(ui, &mut self.scene.strips, &mut self.color_counter);
+            });
 
         egui::CentralPanel::default().show(ctx, |ui| {
             strip_plot(ui, &self.scene);
@@ -62,11 +66,45 @@ impl eframe::App for StripApp {
 }
 
 fn strip_plot(ui: &mut Ui, scene: &Scene) {
-    Plot::new("Plot")
-        .view_aspect(1.0)
-        .show(ui, |plot_ui| {
+    Plot::new("Plot").data_aspect(1.).show(ui, |ui| {
+        for strip in &scene.strips {
+            draw_strip(ui, strip, &scene.dims);
+        }
+    });
+}
 
-        });
+fn draw_strip(ui: &mut PlotUi, strip: &Strip, dims: &Dimensions) {
+    draw_rectangle(
+        ui,
+        Pos2::from(strip.position.map(|v| v * dims.cm_per_norm())),
+        Vec2::from(strip.size),
+        strip.color,
+        strip.rotation.to_radians(),
+    );
+}
+
+fn draw_rectangle(ui: &mut PlotUi, pos: Pos2, size: Vec2, color: Color32, angle: f32) {
+    let rot = Rot2::from_angle(angle);
+
+    let radius = size / 2.;
+
+    let points = [
+        Vec2::new(radius.x, radius.y),
+        Vec2::new(radius.x, -radius.y),
+        Vec2::new(-radius.x, -radius.y),
+        Vec2::new(-radius.x, radius.y),
+        Vec2::new(radius.x, radius.y),
+    ];
+
+    let points = points.map(|v| pos + rot * v);
+
+    for pair in points.windows(2) {
+        let points = vec![
+            [pair[0].x, pair[0].y].map(f64::from),
+            [pair[1].x, pair[1].y].map(f64::from),
+        ];
+        ui.line(Line::new(points).color(color));
+    }
 }
 
 fn strip_controls(ui: &mut Ui, strips: &mut Vec<Strip>, color_counter: &mut usize) {
@@ -150,8 +188,8 @@ fn strip_controls(ui: &mut Ui, strips: &mut Vec<Strip>, color_counter: &mut usiz
     }
 }
 
-const COLOR_TABLE: [Color32; 17] = [
-    Color32::GRAY,
+const COLOR_TABLE: [Color32; 17-2] = [
+    //Color32::GRAY,
     Color32::LIGHT_GRAY,
     Color32::WHITE,
     Color32::BROWN,
@@ -164,7 +202,7 @@ const COLOR_TABLE: [Color32; 17] = [
     Color32::DARK_GREEN,
     Color32::GREEN,
     Color32::LIGHT_GREEN,
-    Color32::DARK_BLUE,
+    //Color32::DARK_BLUE,
     Color32::BLUE,
     Color32::LIGHT_BLUE,
     Color32::GOLD,
