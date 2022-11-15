@@ -1,10 +1,13 @@
 use egui::{
     color_picker::{color_picker_color32, Alpha},
-    panel::Side,
-    Button, Color32, DragValue, Stroke, Ui,
+    panel::{Side, TopBottomSide},
+    Button, Color32, DragValue, Stroke, Ui, plot::Plot,
 };
 
 use crate::{Dimensions, Scene, Strip};
+
+const STRIP_DRAW_WIDTH: f32 = 4.8; // cm
+const STRIP_PAPER_WIDTH: f32 = 5.8; // cm
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -48,20 +51,32 @@ impl eframe::App for StripApp {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::SidePanel::new(Side::Left, "Strips").show(ctx, |ui| {
-            strip_ui(ui, &mut self.scene.strips, &mut self.color_counter);
+        egui::TopBottomPanel::new(TopBottomSide::Top, "Controls").min_height(100.).show(ctx, |ui| {
+            strip_controls(ui, &mut self.scene.strips, &mut self.color_counter);
+        });
+
+        egui::CentralPanel::default().show(ctx, |ui| {
+            strip_plot(ui, &self.scene);
         });
     }
 }
 
-fn strip_ui(ui: &mut Ui, strips: &mut Vec<Strip>, color_counter: &mut usize) {
+fn strip_plot(ui: &mut Ui, scene: &Scene) {
+    Plot::new("Plot")
+        .view_aspect(1.0)
+        .show(ui, |plot_ui| {
+
+        });
+}
+
+fn strip_controls(ui: &mut Ui, strips: &mut Vec<Strip>, color_counter: &mut usize) {
     ui.horizontal(|ui| {
         if ui.button("+").clicked() {
             let color = COLOR_TABLE[*color_counter % COLOR_TABLE.len()];
             *color_counter += 1;
             strips.push(Strip {
                 position: [0.5; 2],
-                size: [4.8, 50.],
+                size: [STRIP_DRAW_WIDTH, 50.],
                 rotation: 0.,
                 color,
             })
