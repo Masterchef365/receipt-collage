@@ -1,10 +1,14 @@
+use std::{fs::File, path::PathBuf};
+
 use eframe::emath::Rot2;
 use egui::{
     color_picker::{color_picker_color32, Alpha},
     panel::{Side, TopBottomSide},
-    plot::{Line, Plot, PlotPoint, PlotUi},
-    Button, Color32, DragValue, Pos2, Stroke, Ui, Vec2,
+    plot::{Line, Plot, PlotImage, PlotPoint, PlotUi},
+    Button, Color32, ColorImage, Context, DragValue, Pos2, Stroke, TextureHandle, TextureId, Ui,
+    Vec2,
 };
+use png::{BitDepth, ColorType};
 
 use crate::{Dimensions, Scene, Strip};
 
@@ -17,11 +21,17 @@ const STRIP_PAPER_WIDTH: f32 = 5.8; // cm
 pub struct StripApp {
     scene: Scene,
     color_counter: usize,
+    path: Option<PathBuf>,
+
+    #[serde(skip)]
+    texture: Option<TextureHandle>,
 }
 
 impl Default for StripApp {
     fn default() -> Self {
         Self {
+            texture: None,
+            path: None,
             color_counter: 0,
             scene: Scene::default(),
         }
@@ -42,6 +52,50 @@ impl StripApp {
 
         Default::default()
     }
+
+    fn load_image_err(&mut self, ctx: &Context) {
+    }
+
+    fn load_image(&mut self, ctx: &Context) {
+        let Some(path) = self.path.as_ref() else {
+            return;
+        };
+
+        let file = match File::open(path) {
+            Ok(f) => f,
+            Err(e) => {
+                eprintln!("Failed to open {}; {:?}", path.display(), e);
+                return;
+            }
+        };
+
+        let decoder = png::Decoder::new(file);
+        let mut reader = decoder.read_info().unwrap();
+        let mut buf = vec![0; reader.output_buffer_size()];
+        let info = reader.next_frame(&mut buf).unwrap();
+
+        if info.bit_depth != BitDepth::Eight {
+            eprintln!("Bit depth must be 8, got {:?}", info.bit_depth);
+            return;
+        }
+
+        if info.color_type != ColorType::Rgba {
+            eprintln!("Color type must RGBA, got {:?}", info.color_type);
+            return;
+        }
+
+        buf.truncate(info.buffer_size());
+
+        let image =
+            ColorImage::from_rgba_unmultiplied([info.width as usize, info.height as usize], &buf);
+        let tex = ctx.load_texture(
+            path.display().to_string(),
+            image,
+            egui::TextureFilter::Nearest,
+        );
+
+        self.texture = Some(tex);
+    }
 }
 
 impl eframe::App for StripApp {
@@ -53,20 +107,43 @@ impl eframe::App for StripApp {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Load image if not present!
+        if self.path.is_some() && self.texture.is_none() {}
+
         egui::TopBottomPanel::new(TopBottomSide::Top, "Controls")
             .min_height(100.)
             .show(ctx, |ui| {
+                if ui.button("Load image").clicked() {
+                    if let Some(path) = rfd::FileDialog::new()
+                        .add_filter("PNG", &["png"])
+                        .pick_file()
+                    {
+                        self.path = Some(path);
+                        self.load_image(ui.ctx());
+                    }
+                }
+
                 strip_controls(ui, &mut self.scene.strips, &mut self.color_counter);
             });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            strip_plot(ui, &self.scene);
+            strip_plot(ui, &self.scene, self.texture.as_ref().map(|t| t.id()));
         });
     }
 }
 
-fn strip_plot(ui: &mut Ui, scene: &Scene) {
+fn strip_plot(ui: &mut Ui, scene: &Scene, tex_id: Option<TextureId>) {
     Plot::new("Plot").data_aspect(1.).show(ui, |ui| {
+        // Reference image
+        if let Some(id) = tex_id {
+            ui.image(PlotImage::new(
+                id,
+                PlotPoint::new(0., 0.),
+                Vec2::new(scene.dims.width(), scene.dims.height()),
+            ))
+        }
+
+        // Strips
         for strip in &scene.strips {
             draw_strip(ui, strip, &scene.dims);
         }
