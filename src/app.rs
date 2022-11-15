@@ -53,9 +53,6 @@ impl StripApp {
         Default::default()
     }
 
-    fn load_image_err(&mut self, ctx: &Context) {
-    }
-
     fn load_image(&mut self, ctx: &Context) {
         let Some(path) = self.path.as_ref() else {
             return;
@@ -108,7 +105,9 @@ impl eframe::App for StripApp {
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Load image if not present!
-        if self.path.is_some() && self.texture.is_none() {}
+        if self.path.is_some() && self.texture.is_none() {
+            self.load_image(ctx);
+        }
 
         egui::TopBottomPanel::new(TopBottomSide::Top, "Controls")
             .min_height(100.)
@@ -136,10 +135,11 @@ fn strip_plot(ui: &mut Ui, scene: &Scene, tex_id: Option<TextureId>) {
     Plot::new("Plot").data_aspect(1.).show(ui, |ui| {
         // Reference image
         if let Some(id) = tex_id {
+            let size = Vec2::new(scene.dims.width(), scene.dims.height());
             ui.image(PlotImage::new(
                 id,
-                PlotPoint::new(0., 0.),
-                Vec2::new(scene.dims.width(), scene.dims.height()),
+                PlotPoint::new(size.x / 2., size.y / 2.),
+                size,
             ))
         }
 
