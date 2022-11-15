@@ -155,7 +155,8 @@ fn strip_controls(ui: &mut Ui, strips: &mut Vec<Strip>, color_counter: &mut usiz
                 ui.add(
                     DragValue::new(&mut strip.size[1])
                         .prefix("Height: ")
-                        .suffix(" cm"),
+                        .suffix(" cm")
+                        .clamp_range(0.0..=f32::MAX),
                 );
 
                 // Rotate
