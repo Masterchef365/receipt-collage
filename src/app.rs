@@ -74,13 +74,18 @@ fn strip_plot(ui: &mut Ui, scene: &Scene) {
 }
 
 fn draw_strip(ui: &mut PlotUi, strip: &Strip, dims: &Dimensions) {
-    draw_rectangle(
-        ui,
-        Pos2::from(strip.position.map(|v| v * dims.cm_per_norm())),
-        Vec2::from(strip.size),
-        strip.color,
-        strip.rotation.to_radians(),
-    );
+    let mut draw_size = |width: f32| {
+        draw_rectangle(
+            ui,
+            Pos2::from(strip.position.map(|v| v * dims.cm_per_norm())),
+            Vec2::new(width, strip.size[1]),
+            strip.color,
+            strip.rotation.to_radians(),
+        )
+    };
+
+    draw_size(strip.size[0]);
+    draw_size(STRIP_PAPER_WIDTH);
 }
 
 fn draw_rectangle(ui: &mut PlotUi, pos: Pos2, size: Vec2, color: Color32, angle: f32) {
@@ -189,7 +194,7 @@ fn strip_controls(ui: &mut Ui, strips: &mut Vec<Strip>, color_counter: &mut usiz
     }
 }
 
-const COLOR_TABLE: [Color32; 17-2] = [
+const COLOR_TABLE: [Color32; 17 - 2] = [
     //Color32::GRAY,
     Color32::LIGHT_GRAY,
     Color32::WHITE,
