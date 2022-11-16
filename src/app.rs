@@ -91,6 +91,8 @@ impl StripApp {
             egui::TextureFilter::Nearest,
         );
 
+        self.scene.dims.resolution = [info.width, info.height];
+
         self.texture = Some(tex);
     }
 }
@@ -123,6 +125,17 @@ impl eframe::App for StripApp {
                     }
                 }
 
+                // Size controls
+                ui.horizontal(|ui| {
+                    ui.add(
+                        DragValue::new(&mut self.scene.dims.width)
+                            .prefix("Width: ")
+                            .suffix("cm")
+                            .clamp_range(0.0..=f32::MAX),
+                    );
+                    ui.label(format!("Height: {} cm", self.scene.dims.height()));
+                });
+
                 ui.horizontal(|ui| {
                     // Save config
                     if ui.button("Save config").clicked() {
@@ -130,7 +143,7 @@ impl eframe::App for StripApp {
                             .add_filter("RON", &["ron"])
                             .save_file()
                         {
-                            let f = File::create(path).expect("Failed to file");
+                            let f = File::create(path).expect("Failed to create file");
                             ron::ser::to_writer_pretty(f, &self.scene, Default::default()).unwrap();
                         }
                     }
@@ -141,7 +154,7 @@ impl eframe::App for StripApp {
                             .add_filter("RON", &["ron"])
                             .pick_file()
                         {
-                            let f = File::open(path).expect("Failed to file");
+                            let f = File::open(path).expect("Failed to open file");
                             self.scene = ron::de::from_reader(f).unwrap();
                         }
                     }
