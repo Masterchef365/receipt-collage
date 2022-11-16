@@ -1,4 +1,8 @@
-use std::{fs::File, path::PathBuf};
+use std::{
+    fs::File,
+    io::BufWriter,
+    path::{Path, PathBuf},
+};
 
 use eframe::emath::Rot2;
 use egui::{
@@ -14,6 +18,8 @@ use crate::{Dimensions, Scene, Strip};
 
 const STRIP_DRAW_WIDTH: f32 = 4.8; // cm
 const STRIP_PAPER_WIDTH: f32 = 5.8; // cm
+const STRIP_PIXELS_PER_ROW: usize = 384;
+const STRIP_DOTS_PER_CM: f32 = STRIP_PIXELS_PER_ROW as f32 / STRIP_DRAW_WIDTH;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -25,6 +31,9 @@ pub struct StripApp {
 
     #[serde(skip)]
     texture: Option<TextureHandle>,
+
+    #[serde(skip)]
+    image_data: Option<ColorImage>,
 }
 
 impl Default for StripApp {
@@ -32,6 +41,7 @@ impl Default for StripApp {
         Self {
             texture: None,
             image_path: None,
+            image_data: None,
             color_counter: 0,
             scene: Scene::default(),
         }
@@ -85,11 +95,14 @@ impl StripApp {
 
         let image =
             ColorImage::from_rgba_unmultiplied([info.width as usize, info.height as usize], &buf);
+
         let tex = ctx.load_texture(
             path.display().to_string(),
-            image,
+            image.clone(),
             egui::TextureFilter::Nearest,
         );
+
+        self.image_data = Some(image);
 
         self.scene.dims.resolution = [info.width, info.height];
 
@@ -159,6 +172,12 @@ impl eframe::App for StripApp {
                         }
                     }
                 });
+
+                if ui.button("Save images").clicked() {
+                    if let Some(input_img) = self.image_data.as_ref() {
+                        sample_strips(input_img, &self.scene.strips, &self.scene.dims)
+                    }
+                }
 
                 // Stip controls
                 strip_controls(ui, &mut self.scene.strips, &mut self.color_counter);
@@ -330,3 +349,83 @@ const COLOR_TABLE: [Color32; 17 - 2] = [
     Color32::LIGHT_BLUE,
     Color32::GOLD,
 ];
+
+fn sample_strips(input_img: &ColorImage, strips: &[Strip], dims: &Dimensions) {
+    for (idx, strip) in strips.iter().enumerate() {
+        let strip_img = sample_strip(input_img, strip, STRIP_DOTS_PER_CM, dims);
+        let fname = format!("{}.png", idx);
+        save_image(fname, &strip_img);
+    }
+}
+
+fn save_image(path: impl AsRef<Path>, image: &ColorImage) {
+    let file = File::create(path).unwrap();
+    let ref mut w = BufWriter::new(file);
+
+    let mut encoder = png::Encoder::new(w, image.width() as _, image.height() as _); // Width is 2 pixels and height is 1.
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Eight);
+    let mut writer = encoder.write_header().unwrap();
+
+    let bytes: Vec<u8> = image
+        .pixels
+        .iter()
+        .map(|p| p.to_array())
+        .flatten()
+        .collect();
+
+    writer.write_image_data(&bytes).unwrap();
+}
+
+fn sample_strip(
+    input_img: &ColorImage,
+    strip: &Strip,
+    dots_per_cm: f32,
+    dims: &Dimensions,
+) -> ColorImage {
+    let mut strip_img = ColorImage::new(
+        strip.size.map(|v| (v * dots_per_cm) as usize),
+        Color32::WHITE,
+    );
+
+    for y in 0..strip_img.height() {
+        for x in 0..strip_img.width() {
+            let cm = strip_pixel_cm(x, y, strip, dots_per_cm, dims);
+            if let Some(idx) = image_cm_index(cm, dims) {
+                strip_img[(x, y)] = input_img[idx];
+            }
+        }
+    }
+
+    strip_img
+}
+
+/// Translates the given pixel on the given strip into cm in the image space
+fn strip_pixel_cm(x: usize, y: usize, strip: &Strip, dots_per_cm: f32, dims: &Dimensions) -> Vec2 {
+    let px = Vec2::new(x as f32, y as f32);
+    let wh = Vec2::from(strip.size);
+
+    let xy = px / wh / dots_per_cm; // Normalize to 0 to 1
+    let xy = xy * 2. - Vec2::splat(1.); // Convert to -1 to 1
+    let xy = xy * wh; // Convert back to cm
+
+    let r = Rot2::from_angle(-strip.rotation.to_radians());
+
+    let pos = dims.cm_per_norm() * Vec2::from(strip.position);
+
+    pos + r * xy
+}
+
+/// Translates a position in cm into a pixel index in the iamge
+fn image_cm_index(xy: Vec2, dims: &Dimensions) -> Option<(usize, usize)> {
+    let norm = xy / Vec2::new(dims.width(), dims.height());
+
+    if norm.x >= 0. && norm.x <= 1. && norm.y >= 0. && norm.y <= 1. {
+        let res = Vec2::from(dims.resolution.map(|v| v as f32));
+        let px = res * norm;
+        let idx = (px.x as usize, px.y as usize);
+        Some(idx)
+    } else {
+        None
+    }
+}
