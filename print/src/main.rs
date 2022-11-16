@@ -64,7 +64,7 @@ fn load_bitmap_png(path: impl AsRef<Path>) -> Result<Vec<u8>> {
 fn bits_to_bools(image: &[u8]) -> Vec<bool> {
     image
         .iter()
-        .map(|b| (0..8).map(move |i| (b << i) & 0x80 != 0))
+        .map(|b| (0..8).map(move |i| (b << i) & 0x80 == 0))
         .flatten()
         .collect()
 }
