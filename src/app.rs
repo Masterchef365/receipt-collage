@@ -407,7 +407,7 @@ fn strip_pixel_cm(x: usize, y: usize, strip: &Strip, dots_per_cm: f32, dims: &Di
 
     let xy = px / wh / dots_per_cm; // Normalize to 0 to 1
     let xy = xy * 2. - Vec2::splat(1.); // Convert to -1 to 1
-    let xy = xy * wh; // Convert back to cm
+    let xy = xy * wh / 2.; // Convert back to cm
 
     let r = Rot2::from_angle(-strip.rotation.to_radians());
 
@@ -418,13 +418,21 @@ fn strip_pixel_cm(x: usize, y: usize, strip: &Strip, dots_per_cm: f32, dims: &Di
 
 /// Translates a position in cm into a pixel index in the iamge
 fn image_cm_index(xy: Vec2, dims: &Dimensions) -> Option<(usize, usize)> {
-    let norm = xy / Vec2::new(dims.width(), dims.height());
+    let mut norm = xy / Vec2::new(dims.width(), dims.height());
 
-    if norm.x >= 0. && norm.x <= 1. && norm.y >= 0. && norm.y <= 1. {
-        let res = Vec2::from(dims.resolution.map(|v| v as f32));
-        let px = res * norm;
-        let idx = (px.x as usize, px.y as usize);
-        Some(idx)
+    // The image is actually upside down!
+    //norm.y = 1. - norm.y;
+
+    let res = Vec2::from(dims.resolution.map(|v| v as f32));
+    let px = res * norm;
+    let x = px.x as isize;
+    let y = px.y as isize;
+
+    let x_bnd = x > 0 && x < dims.resolution[0] as isize;
+    let y_bnd = y > 0 && y < dims.resolution[1] as isize;
+
+    if x_bnd && y_bnd {
+        Some((x as usize, y as usize))
     } else {
         None
     }
