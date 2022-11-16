@@ -2,7 +2,7 @@
 
 mod app;
 pub use app::StripApp;
-use egui::Color32;
+use egui::{Color32, Vec2};
 use serde::{Deserialize, Serialize};
 
 /// Dimensions of the peice
@@ -53,8 +53,11 @@ impl Dimensions {
     }
 
     /// Pixels per centimeter
-    pub fn px_per_cm(&self) -> f32 {
-        self.resolution[0] as f32 / self.width()
+    pub fn px_per_cm(&self) -> Vec2 {
+        Vec2::new(
+            self.resolution[0] as f32 / self.width(),
+            self.resolution[1] as f32 / self.height(),
+        )
     }
 
     /// Centimeters per unit (normal) coordinate
