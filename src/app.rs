@@ -28,6 +28,7 @@ pub struct StripApp {
     scene: Scene,
     color_counter: usize,
     image_path: Option<PathBuf>,
+    out_path: Option<PathBuf>,
 
     #[serde(skip)]
     texture: Option<TextureHandle>,
@@ -39,6 +40,7 @@ pub struct StripApp {
 impl Default for StripApp {
     fn default() -> Self {
         Self {
+            out_path: None,
             texture: None,
             image_path: None,
             image_data: None,
@@ -138,6 +140,16 @@ impl eframe::App for StripApp {
                     }
                 }
 
+                // Set output path
+                let output_path = self
+                    .out_path
+                    .as_ref()
+                    .map(|v| v.display().to_string())
+                    .unwrap_or("Set output path".into());
+                if ui.button(output_path).clicked() {
+                    self.out_path = prompt_output_path();
+                }
+
                 // Size controls
                 ui.horizontal(|ui| {
                     ui.add(
@@ -174,8 +186,15 @@ impl eframe::App for StripApp {
                 });
 
                 if ui.button("Save images").clicked() {
-                    if let Some(input_img) = self.image_data.as_ref() {
-                        sample_strips(input_img, &self.scene.strips, &self.scene.dims)
+                    if let Some(output_path) = self.out_path.clone().or_else(prompt_output_path) {
+                        if let Some(input_img) = self.image_data.as_ref() {
+                            sample_strips(
+                                &output_path,
+                                input_img,
+                                &self.scene.strips,
+                                &self.scene.dims,
+                            )
+                        }
                     }
                 }
 
@@ -187,6 +206,10 @@ impl eframe::App for StripApp {
             strip_plot(ui, &self.scene, self.texture.as_ref().map(|t| t.id()));
         });
     }
+}
+
+fn prompt_output_path() -> Option<PathBuf> {
+    rfd::FileDialog::new().pick_folder()
 }
 
 fn strip_plot(ui: &mut Ui, scene: &Scene, tex_id: Option<TextureId>) {
@@ -271,6 +294,8 @@ fn strip_controls(ui: &mut Ui, strips: &mut Vec<Strip>, color_counter: &mut usiz
     egui::containers::ScrollArea::vertical().show(ui, |ui| {
         for (idx, strip) in strips.iter_mut().enumerate() {
             ui.horizontal(|ui| {
+                ui.label(format!("{}: ", idx));
+
                 // Change color
                 let butt = Button::new("Color").fill(strip.color);
                 if ui.add(butt).clicked() {
@@ -350,10 +375,10 @@ const COLOR_TABLE: [Color32; 17 - 2] = [
     Color32::GOLD,
 ];
 
-fn sample_strips(input_img: &ColorImage, strips: &[Strip], dims: &Dimensions) {
+fn sample_strips(out_path: &PathBuf, input_img: &ColorImage, strips: &[Strip], dims: &Dimensions) {
     for (idx, strip) in strips.iter().enumerate() {
         let strip_img = sample_strip(input_img, strip, STRIP_DOTS_PER_CM, dims);
-        let fname = format!("{}.png", idx);
+        let fname = out_path.join(format!("{}.png", idx));
         save_image(fname, &strip_img);
     }
 }
