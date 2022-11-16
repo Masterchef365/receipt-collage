@@ -1,0 +1,10 @@
+[package]
+name = "print"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+pos58_usb = { git = "https://github.com/Masterchef365/pos58_usb.git", rev = "7a8a20d" }
+png = "0.17.7"
+libusb = "0.3"
