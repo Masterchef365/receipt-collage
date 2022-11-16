@@ -21,7 +21,7 @@ const STRIP_PAPER_WIDTH: f32 = 5.8; // cm
 pub struct StripApp {
     scene: Scene,
     color_counter: usize,
-    path: Option<PathBuf>,
+    image_path: Option<PathBuf>,
 
     #[serde(skip)]
     texture: Option<TextureHandle>,
@@ -31,7 +31,7 @@ impl Default for StripApp {
     fn default() -> Self {
         Self {
             texture: None,
-            path: None,
+            image_path: None,
             color_counter: 0,
             scene: Scene::default(),
         }
@@ -54,7 +54,7 @@ impl StripApp {
     }
 
     fn load_image(&mut self, ctx: &Context) {
-        let Some(path) = self.path.as_ref() else {
+        let Some(path) = self.image_path.as_ref() else {
             return;
         };
 
@@ -105,23 +105,49 @@ impl eframe::App for StripApp {
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Load image if not present!
-        if self.path.is_some() && self.texture.is_none() {
+        if self.image_path.is_some() && self.texture.is_none() {
             self.load_image(ctx);
         }
 
         egui::TopBottomPanel::new(TopBottomSide::Top, "Controls")
             .min_height(100.)
             .show(ctx, |ui| {
+                // Load image
                 if ui.button("Load image").clicked() {
                     if let Some(path) = rfd::FileDialog::new()
                         .add_filter("PNG", &["png"])
                         .pick_file()
                     {
-                        self.path = Some(path);
+                        self.image_path = Some(path);
                         self.load_image(ui.ctx());
                     }
                 }
 
+                ui.horizontal(|ui| {
+                    // Save config
+                    if ui.button("Save config").clicked() {
+                        if let Some(path) = rfd::FileDialog::new()
+                            .add_filter("RON", &["ron"])
+                            .save_file()
+                        {
+                            let f = File::create(path).expect("Failed to file");
+                            ron::ser::to_writer_pretty(f, &self.scene, Default::default()).unwrap();
+                        }
+                    }
+
+                    // Load config
+                    if ui.button("Load config").clicked() {
+                        if let Some(path) = rfd::FileDialog::new()
+                            .add_filter("RON", &["ron"])
+                            .pick_file()
+                        {
+                            let f = File::open(path).expect("Failed to file");
+                            self.scene = ron::de::from_reader(f).unwrap();
+                        }
+                    }
+                });
+
+                // Stip controls
                 strip_controls(ui, &mut self.scene.strips, &mut self.color_counter);
             });
 
